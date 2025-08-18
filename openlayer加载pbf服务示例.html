@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>OGC Vector Tiles</title>
+  <!-- Pointer events polyfill for old browsers, see https://caniuse.com/#feat=pointer -->
+  <!-- The lines below are only needed for old environments like Internet Explorer and Android 4.x -->
+
+  <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.0/dist/ol.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.6.0/ol.css">
+
+  <script type="text/javascript" src="http://localhost:8080/lib/external/proj4.js"></script>
+
+  <style>
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+  <script>
+
+    let srs = {
+      'EPSG:100006': "+proj=tmerc +lat_0=39.865766 +lon_0=116.350252 +k=1 +x_0=500000 +y_0=300000 +ellps=krass +towgs84=31.4,-144.3,-74.8,0,0,0.814,-0.38 +units=m +no_defs +type=crs",
+      'EPSG:100007': "+proj=tmerc +lat_0=39.9061111111 +lon_0=116.3911111111 +k=1 +x_0=800000 +y_0=600000 +ellps=GRS80 +units=m +no_defs +type=crs",
+    }
+
+    // proj4.defs(defCRS, srs[defCRS] || '+proj=longlat +ellps=GRS80 +units=degrees +no_defs');
+    proj4.defs('EPSG:4490', "+proj=longlat +ellps=GRS80 +units=degrees +no_defs");
+    const projection = new ol.proj.Projection({
+      code: 'EPSG:4490',
+      units: 'degrees',
+    })
+    var map = new ol.Map({
+      target: 'map',
+      view: new ol.View({
+        projection: projection
+      }),
+      logo: false
+    })
+    var wmslayer = new ol.layer.Image({
+      visible: true,
+      source: new ol.source.ImageWMS({
+        ratio: 1,
+        url: 'http://192.168.3.14:18080/gInfer/ows',
+        params: {
+          VERSION: '1.1.1',
+          SRS: 'EPSG:4490',
+          FORMAT: 'image/png',
+          LAYERS: "gInfer:building202410007mvt1",
+          STYLES: "polygon",
+        }
+      })
+    })
+    map.addLayer(wmslayer)
+    let wmstlayer = new ol.layer.VectorTile({
+      declutter: true,
+      source: new ol.source.VectorTile({
+        format: new ol.format.MVT({}),
+        projection: projection,
+        tileGrid: new ol.tilegrid.TileGrid({
+          tileSize: 256,
+          extent: [-180, -90, 180, 90],
+          origin: [-180, 90],
+          resolutions: [
+            0.7031249999999998,
+            0.3515624999999999,
+            0.17578124999999994,
+            0.08789062499999997,
+            0.043945312499999986,
+            0.021972656249999993,
+            0.010986328124999997,
+            0.005493164062499998,
+            0.002746582031249999,
+            0.0013732910156249996,
+            0.0006866455078124998,
+            0.0003433227539062499,
+            0.00017166137695312495,
+            0.00008583068847656247,
+            0.000042915344238281236,
+            0.000021457672119140618,
+            0.000010728836059570309,
+            0.0000053644180297851546,
+            0.0000026822090148925773,
+            0.0000013411045074462886,
+            6.705522537231443e-7
+          ]
+        }),
+        tileUrlFunction: function (tileCoord, pixelRatio, projection) {
+          if (!tileCoord) {
+            return undefined;
+          }
+
+          const z = tileCoord[0];
+          const x = tileCoord[1];
+          const y = tileCoord[2];
+
+          // 对于EPSG:4490投影，使用TMS瓦片坐标系统
+          // TMS的Y坐标是从下到上，需要转换
+          const tmsY = Math.pow(2, z) - 1 - y;
+
+          return 'http://192.168.3.14:18080/gInfer/tms/gInfer:building202410007mvt1@epsg4490test_da8faca3@pbf/' + z + '/' + x + '/' + tmsY + '.pbf';
+        }
+      }),
+      style: new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: '#000',
+          width: 2,
+        }),
+        fill: new ol.style.Fill({ color: 'rgba(255,20,20,0.1)' }),
+      })
+
+    });
+    map.addLayer(wmstlayer)
+    setTimeout(() => {
+      map.getView().fit([116.08023227411383, 40.004890323409356, 116.09094648478644, 40.01629082828421], map.getSize())
+      window.onresize = function () {
+        if (map) map.updateSize()
+      }
+    }, 2000)
+
+
+
+
+  </script>
+</body>
+
+</html>

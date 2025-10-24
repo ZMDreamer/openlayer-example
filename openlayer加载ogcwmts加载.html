@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="http://192.168.1.111:8001/static/lib/ol.css" rel="stylesheet" />
+    <link
+      href="http://192.168.1.111:8001/static/lib/ol.ext.css"
+      rel="stylesheet"
+    />
+    <script
+      type="text/javascript"
+      src="http://192.168.1.111:8001/static/lib/ol.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="http://192.168.1.111:8001/static/lib/proj4.js"
+    ></script>
+    <script src="http://192.168.1.111:8001/static/lib/defineCRS.js"></script>
+    <title>olwmts加载示例</title>
+    <style type="text/css">
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+        background-color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+  </body>
+  <script type="text/javascript">
+    var url = new URL(
+      "http://110xdmo484543.vicp.fun:18236/abpd-develop/hgis/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&FORMAT=image/png&TILECOL=0&TILEROW=0&TILEMATRIXSET=TDT_2&MATRIXSET=TDT_2&TILEMATRIX=TDT_2:0&LAYERS=ktw:xytext_2018_level_17AXZ&accessToken=YCjPOQLbiEOcRzMLy5SVT9z858PgB0rSgpJYcQkvDMwwA%2FRfot%2FM2%2Fk9iRJB6ljJ"
+    );
+    var defCRS = url.searchParams.get("SRS") || "EPSG:4490";
+    var isArcGISCache = false;
+    var bbox = url.searchParams.get("BBOX") || [];
+    var accessToken = url.searchParams.get("accessToken") || "";
+    var matrixSet = url.searchParams.get("MATRIXSET") || "";
+    var layerName =
+      url.searchParams.get("LAYERS") ||
+      url.searchParams.get("layers") ||
+      url.searchParams.get("LAYER") ||
+      url.searchParams.get("layer");
+    var requestUrl = new URL(url.origin + url.pathname);
+    requestUrl.searchParams.append("request", "GetCapabilities");
+    requestUrl.searchParams.append("service", "wmts");
+    requestUrl.searchParams.append("layer", layerName);
+    requestUrl.searchParams.append("accessToken", accessToken);
+    proj4.defs(defCRS, "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
+
+    ol.proj.proj4.register(proj4);
+    var map = new ol.Map({
+      target: "map",
+      view: new ol.View({
+        projection: ol.proj.get(defCRS),
+      }),
+      logo: false,
+    });
+    fetch(requestUrl)
+      .then((res) => res.text())
+      .then((xml) => {
+        var result = new ol.format.WMTSCapabilities().read(xml);
+        var extent = [];
+        var wmstlayer = "";
+        var option = ol.source.WMTS.optionsFromCapabilities(result, {
+          layer: layerName,
+          matrixSet,
+        });
+        extent = option.tileGrid.extent_;
+        wmstlayer = new ol.layer.Tile({
+          visible: true,
+          extent,
+          source: new ol.source.WMTS({
+            url: option.urls[0] + "&accessToken=" + accessToken,
+            layer: option.layer,
+            matrixSet: option.matrixSet,
+            format: option.format || "image/png",
+            tileGrid: option.tileGrid,
+            // tileGrid: new ol.tilegrid.WMTS({
+            //   extent,
+            //   resolutions: option?.tileGrid.resolutions_,
+            //   matrixIds: option?.tileGrid.matrixIds_,
+            //   origins: option?.tileGrid.origins_,
+            // }),
+          }),
+        });
+        map.addLayer(wmstlayer);
+        map.getView().fit(extent, {
+          viewProj: true,
+          duration: 1000,
+        });
+      });
+  </script>
+</html>

@@ -1,0 +1,133 @@
+.ol-control button {
+    color: #666;
+    background-color: #fff;
+    box-shadow: 2px 2px 3px #cccccc;
+}
+
+.ol-control button:hover {
+    color: rgb(92, 173, 255);
+    background-color: #fff;
+}
+
+.ol-control button:focus {
+    background-color: #fff;
+}
+
+.ol-zoom {
+    bottom: .5em;
+    top: auto;
+    /** IE不兼容 
+    top: unset; 
+    */
+}
+
+.ol-popup {
+    position: absolute;
+    background-color: white;
+    -webkit-filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.2));
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #cccccc;
+    bottom: 12px;
+    left: -50px;
+    min-width: 280px;
+}
+
+.ol-popup:after,
+.ol-popup:before {
+    top: 100%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+.ol-popup:after {
+    border-top-color: white;
+    border-width: 10px;
+    left: 48px;
+    margin-left: -10px;
+}
+
+.ol-popup:before {
+    border-top-color: #cccccc;
+    border-width: 11px;
+    left: 48px;
+    margin-left: -11px;
+}
+
+.ol-popup-closer {
+    text-decoration: none;
+    position: absolute;
+    top: 2px;
+    right: 8px;
+}
+
+.ol-popup-closer:after {
+    content: "✖";
+}
+
+.ol-popup #popup-content {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.overlay-table {
+    width: 100%;
+    height: 100%;
+    color: #666666;
+}
+
+.overlay-table tr {
+    line-height: 24px;
+    border-bottom: dashed 1px #eee;
+}
+
+.overlay-table tr .overlay-table-title {
+    font-weight: bold;
+}
+
+.ol-zoomslider { 
+    left: 0.5em; height: 200px; bottom: 55px; top: auto;
+}
+.ol-zoomslider button::before{
+    top: 0px;
+    width: 8px;
+    height: 8px;
+    content: "";
+    position: absolute;
+    box-sizing: content-box;
+    border-top: 1px solid #ccc;
+    border-left: 1px solid #ccc;
+    transition: top 250ms,transform 250ms;
+    -moz-transition: top 250ms,-moz-transform 250ms;
+    -webkit-transition: top 250ms,-webkit-transform 250ms;
+    -o-transition: top 250ms,-o-transform 250ms;
+    transform: rotate(-45deg);
+    -ms-transform: rotate(-45deg);
+    -moz-transform: rotate(-45deg);
+    -webkit-transform: rotate(-45deg);
+    -o-transform: rotate(-45deg);
+    margin-left: 15px;
+    z-index: 2;
+    background: #fff;
+}
+.ol-zoomslider button::after{
+    /* content: "第1级"; */
+    content: attr(zoom);
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    box-shadow: 1px 1px 2px #cccccc;
+    color: #666;
+    font-size: 5px;
+    margin-left: 19px;
+    width: 22px;
+    position: absolute;
+    height: 20px;
+    top: -7px;
+    background: #fff;
+    line-height: 20px;
+}

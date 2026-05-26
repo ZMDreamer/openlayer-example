@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="./lib/ol.css" rel="stylesheet" />
+    <link href="./lib/ol.ext.css" rel="stylesheet" />
+    <script type="text/javascript" src="./lib/ol-debug.js"></script>
+    <script type="text/javascript" src="./lib/proj4.js"></script>
+    <script src="./lib/defineCRS.js"></script>
+    <script src="./lib/axios.min.js"></script>
+    <title>地图点选要素查询</title>
+    <style type="text/css">
+      /* 页面全局样式配置 */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        background-color: #f8fafc;
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+      }
+
+      /* 地图容器样式 */
+      #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        cursor: pointer;
+      }
+
+      /* 现代暗色调毛玻璃侧边栏 */
+      .feature-sidebar {
+        position: absolute;
+        top: 20px;
+        right: -380px;
+        width: 340px;
+        height: calc(100% - 40px);
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 16px;
+        box-shadow:
+          0 20px 25px -5px rgba(0, 0, 0, 0.1),
+          0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        color: #334155;
+        transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* 侧边栏激活状态 */
+      .feature-sidebar.active {
+        right: 20px;
+      }
+
+      /* 侧边栏头部区域 */
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 20px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        background: rgba(0, 0, 0, 0.02);
+      }
+
+      /* 侧边栏标题效果 */
+      .sidebar-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        color: #0369a1;
+      }
+
+      /* 关闭按钮样式 */
+      .sidebar-close {
+        background: transparent;
+        border: none;
+        color: #64748b;
+        font-size: 22px;
+        cursor: pointer;
+        transition: all 0.3s;
+        line-height: 1;
+        padding: 4px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .sidebar-close:hover {
+        color: #0f172a;
+        background: rgba(0, 0, 0, 0.05);
+      }
+
+      /* 侧边栏内容区域，包含滚动条定制 */
+      .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+      }
+
+      .sidebar-content::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .sidebar-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .sidebar-content::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 3px;
+      }
+
+      .sidebar-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.25);
+      }
+
+      /* 空白提示状态 */
+      .info-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #64748b;
+        text-align: center;
+        font-size: 14px;
+      }
+
+      .info-empty p {
+        margin: 0;
+      }
+
+      /* 离线降级服务警示栏 */
+      .info-alert {
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        color: #d97706;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* 属性数据表格 */
+      .attribute-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 5px;
+      }
+
+      .attribute-table tr {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .attribute-table tr:last-child {
+        border-bottom: none;
+      }
+
+      .attribute-table td {
+        padding: 12px 8px;
+        font-size: 13px;
+        line-height: 1.5;
+        vertical-align: top;
+      }
+
+      .attribute-table td.key {
+        color: #64748b;
+        width: 40%;
+        font-weight: 500;
+      }
+
+      .attribute-table td.val {
+        color: #1e293b;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- 地图容器 -->
+    <div id="map"></div>
+
+    <!-- 侧边栏属性显示面板 -->
+    <div id="feature-sidebar" class="feature-sidebar">
+      <div class="sidebar-header">
+        <h3 class="sidebar-title">要素属性详情</h3>
+        <button id="sidebar-close" class="sidebar-close" title="关闭属性面板">
+          &times;
+        </button>
+      </div>
+      <div class="sidebar-content">
+        <!-- 未选中状态 -->
+        <div id="feature-info-empty" class="info-empty">
+          <p>请在地图上点选相应要素查看属性</p>
+        </div>
+        <!-- 属性展示区 -->
+        <div id="feature-info-details" style="display: none">
+          <!-- 降级警告浮窗 -->
+          <div
+            class="info-alert"
+            id="fallback-alert"
+            style="display: none"
+          ></div>
+          <table class="attribute-table">
+            <tbody id="attribute-list">
+              <!-- 动态插入属性 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+    // 数据图层 WMS 获取配置
+    const url = new URL(
+      "http://110xdmo484543.vicp.fun:18236//hgis/ows?SERVICE=WMS&version=1.1.1&REQUEST=GetMap&FORMAT=image%2Fpng&WIDTH=800&HEIGHT=600&layers=ktw:primary_4490&srs=EPSG:4490&bbox=112.64268130601386,27.787782867574634,113.09227033795868,28.083542893586515&styles=polygon",
+    );
+    const defCRS = url.searchParams.get("srs");
+    const rawBbox = url.searchParams.get("bbox") || "";
+    const layerName =
+      url.searchParams.get("LAYERS") || url.searchParams.get("layers");
+    const styles =
+      url.searchParams.get("STYLES") || url.searchParams.get("styles");
+
+    // 注册并配置对应 CRS 的投影信息
+    proj4.defs(
+      defCRS,
+      GET_OL_MAP_STRPROJECT(defCRS) ||
+        "+proj=longlat +ellps=GRS80 +units=degrees +no_defs",
+    );
+
+    // 地图实例化
+    const map = new ol.Map({
+      target: "map",
+      view: new ol.View({
+        projection: ol.proj.get(defCRS),
+      }),
+      controls: new ol.control.defaults({ zoom: true, attribution: false }),
+      logo: false,
+    });
+
+    const bboxArray = rawBbox ? rawBbox.split(",").map(Number) : [];
+    let wmslayer = null;
+
+    // 初始化高亮矢量要素图层的数据源和渲染样式
+    const highlightSource = new ol.source.Vector();
+    const highlightLayer = new ol.layer.Vector({
+      source: highlightSource,
+      style: new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: "rgba(2, 132, 199, 1)", // 亮蓝色边框
+          width: 3.5,
+        }),
+        fill: new ol.style.Fill({
+          color: "rgba(2, 132, 199, 0.15)", // 浅蓝色透明填充
+        }),
+      }),
+      zIndex: 9999, // 确保高亮层显示在最上层
+    });
+    map.addLayer(highlightLayer);
+
+    // 延迟加载基础 WMS 图层
+    setTimeout(loadBaseData, 2000);
+
+    /**
+     * 加载基础 WMS 数据图层并缩放至指定范围
+     */
+    function loadBaseData() {
+      wmslayer = new ol.layer.Image({
+        visible: true,
+        source: new ol.source.ImageWMS({
+          ratio: 1,
+          url: `${url.origin}${url.pathname}`,
+          params: {
+            VERSION: "1.1.1",
+            SRS: defCRS,
+            FORMAT: "image/png",
+            LAYERS: layerName,
+            STYLES: styles,
+          },
+        }),
+      });
+      map.addLayer(wmslayer);
+
+      setTimeout(() => {
+        if (bboxArray.length === 4 && !bboxArray.some(isNaN)) {
+          map.getView().fit(bboxArray, map.getSize());
+        }
+      });
+    }
+
+    // 地图尺寸更新监听
+    window.addEventListener("resize", () => {
+      if (map) {
+        map.updateSize();
+      }
+    });
+
+    /**
+     * 地图单点击事件监听
+     */
+    map.on("singleclick", (evt) => {
+      // 重置前一次的高亮和面板状态
+      highlightSource.clear();
+      hideSidebar();
+
+      const coordinate = evt.coordinate;
+
+      // 执行混合点选要素查询逻辑
+      queryFeature(coordinate);
+    });
+
+    /**
+     * 进行混合点选要素查询 (WMS GetFeatureInfo -> WFS -> 模拟数据降级)
+     * @param {ol.Coordinate} coordinate 点击点坐标
+     * @param {number} resolution 地图当前分辨率
+     * @param {ol.proj.Projection} projection 当前视口投影
+     */
+    async function queryFeature(coordinate) {
+      try {
+        const res = await getFeatures({
+          geometry: `point(${coordinate[0]} ${coordinate[1]})`,
+          baserUrl: `${url.origin}${url.pathname}`,
+          srsName: defCRS,
+          typename: layerName,
+        });
+
+        console.log("查询返回结果:", res);
+
+        if (res && res.data) {
+          let geojsonData = res.data;
+
+          // 兼容处理：如果返回的是要素数组（如示例数据），则封装为标准的 FeatureCollection
+          if (Array.isArray(geojsonData)) {
+            geojsonData = {
+              type: "FeatureCollection",
+              features: geojsonData,
+            };
+          }
+
+          // 确认存在要素数据后进行解析渲染
+          if (geojsonData.features && geojsonData.features.length > 0) {
+            const parser = new ol.format.GeoJSON();
+            const features = parser.readFeatures(geojsonData, {
+              dataProjection: defCRS, // 指定数据本身的投影 (EPSG:4490)
+              featureProjection: map.getView().getProjection(), // 转换为地图视图的投影
+            });
+
+            if (features && features.length > 0) {
+              // 选取第一个匹配的要素展示详细信息和高亮
+              displayFeatureDetails(features[0], false);
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("WFS 空间相交查询发生错误:", error);
+      }
+
+      // 如果未查到要素或发生错误，隐藏侧边栏
+      hideSidebar();
+    }
+
+    /**
+     * 将查询结果及属性展现在侧边栏中，并在地图上显示高亮几何图形
+     * @param {ol.Feature} feature 查询到的或模拟的要素对象
+     * @param {boolean} isFallback 是否为模拟的降级数据
+     */
+    function displayFeatureDetails(feature, isFallback) {
+      // 1. 在高亮图层上添加该要素，以实现亮蓝色的渲染呈现
+      highlightSource.clear();
+
+      const geometry = feature.getGeometry();
+      if (geometry) {
+        highlightSource.addFeature(feature);
+        // 注释掉：不需要自动缩放，保持当前地图展示和用户的上下文视野
+        // map.getView().fit(geometry, {
+        //   size: map.getSize(),
+        //   duration: 600,
+        //   maxZoom: 16,
+        // });
+      }
+
+      // 3. 更新侧边栏数据
+      const alertPanel = document.getElementById("fallback-alert");
+      if (alertPanel) {
+        alertPanel.style.display = isFallback ? "flex" : "none";
+      }
+
+      const listContainer = document.getElementById("attribute-list");
+      listContainer.innerHTML = "";
+
+      const properties = feature.getProperties();
+      const systemFields = ["geometry", "geom", "boundedBy", "bbox"];
+
+      Object.keys(properties).forEach((key) => {
+        if (systemFields.includes(key)) {
+          return;
+        }
+
+        const val = properties[key];
+        if (typeof val === "object" && val !== null) {
+          return;
+        }
+
+        // 采用安全的文本节点生成方式填充 DOM，绝对杜绝 XSS 注入可能
+        const trNode = document.createElement("tr");
+
+        const tdKeyNode = document.createElement("td");
+        tdKeyNode.className = "key";
+        tdKeyNode.textContent = String(key);
+
+        const tdValNode = document.createElement("td");
+        tdValNode.className = "val";
+        tdValNode.textContent = String(val);
+
+        trNode.appendChild(tdKeyNode);
+        trNode.appendChild(tdValNode);
+        listContainer.appendChild(trNode);
+      });
+
+      // 显示侧边栏
+      document.getElementById("feature-info-empty").style.display = "none";
+      document.getElementById("feature-info-details").style.display = "block";
+      document.getElementById("feature-sidebar").classList.add("active");
+    }
+
+    /**
+     * 隐藏属性显示面板，清除高亮图层中残留的要素
+     */
+    function hideSidebar() {
+      document.getElementById("feature-sidebar").classList.remove("active");
+      highlightSource.clear();
+    }
+
+    // 绑定关闭按钮的点击事件
+    document
+      .getElementById("sidebar-close")
+      .addEventListener("click", hideSidebar);
+
+    /**
+     * 兼容用户现有的 getFeatures 接口，将其改为现代化 fetch 版本
+     * @param {ol.geom.Geometry} geometry 用于空间查询的几何图形
+     */
+    async function getFeatures({ geometry, baserUrl, srsName, typename }) {
+      try {
+        const response = await axios({
+          url: baserUrl,
+          method: "post",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          data: {
+            version: "1.0.0",
+            service: "WFS",
+            request: "GetFeature",
+            typename,
+            startIndex: 0,
+            count: 20,
+            outputFormat: "application/json",
+            srsName,
+            geometry,
+            relation: "Intersects",
+          },
+        });
+        return response;
+      } catch (error) {
+        console.error("getFeatures 调用失败:", error);
+      }
+      return null;
+    }
+  </script>
+</html>
